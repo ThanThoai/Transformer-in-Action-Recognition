@@ -11,7 +11,6 @@ from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
 import torch
 import torch.utils.data as data
 from dataset import ActionDataModule
-import data_transform as T
 from utils import print_on_rank_zero, get_mean, get_std
 from opts import parse_args
 from .spatial_transforms import *
@@ -49,12 +48,12 @@ def run():
 	if not args.no_train:
 		assert args.train_crop in ['random', 'corner', 'center']
 		if args.train_crop == 'random':
-			crop_method = MultiScaleRandomCrop(args.scales, args.sample_size)
+			crop_method = MultiScaleRandomCrop(args.scales, args.img_size)
 		elif args.train_crop == 'corner':
-			crop_method = MultiScaleCornerCrop(args.scales, args.sample_size)
+			crop_method = MultiScaleCornerCrop(args.scales, args.img_size)
 		elif args.train_crop == 'center':
 			crop_method = MultiScaleCornerCrop(
-				args.scales, args.sample_size, crop_positions=['c'])
+				args.scales, args.img_size, crop_positions=['c'])
 
 		train_spatial_transform = Compose([
 			RandomHorizontalFlip(),
@@ -78,9 +77,9 @@ def run():
 
 	if not args.no_val:
 		val_spatial_transform = Compose([
-			Scale(args.sample_size),
-			CenterCrop(args.sample_size),
-			ToTensor(args.norm_value), norm_method
+			Scale(args.img_size),
+			# CenterCrop(args.img_size),
+			ToTensor(args.img_size), norm_method
 		])
 		#temporal_transform = LoopPadding(opt.sample_duration)
 		val_temporal_transform = TemporalCenterCrop(args.sample_duration, args.downsample)
@@ -92,8 +91,8 @@ def run():
 
 	if args.test:
 		test_spatial_transform = Compose([
-			Scale(int(args.sample_size / args.scale_in_test)),
-			CornerCrop(args.sample_size, args.crop_position_in_test),
+			Scale(int(args.img_size / args.scale_in_test)),
+			CornerCrop(args.img_size, args.crop_position_in_test),
 			ToTensor(args.norm_value), norm_method
 		])
 		test_temporal_transform = TemporalRandomCrop(args.sample_duration, args.downsample)
@@ -129,6 +128,7 @@ def run():
 		max_epochs=args.num_epochs,
 		callbacks=[
 			LearningRateMonitor("epoch"),
+			ModelCheckpoint(every_n_epoch = 1)
 		],
 		logger=comet_logger,
 		check_val_every_n_epoch=1,
