@@ -9,9 +9,43 @@ import torch.optim as optim
 import torchvision
 from torchmetrics import Accuracy
 
-from model import ClassificationHead
+from model import ClassificationHead, TimeSformer, ViViT
 from utils import timeit_wrapper
-from models import get_model
+
+
+def get_model(opt):
+    if opt.model == 'timesformer':
+        assert opt.attention_type in ['divided_space_time', 'space_only', 'joint_space_time']
+        model = TimeSformer(
+            num_frames=opt.num_frames,
+            img_size=opt.img_size,
+            patch_size=opt.patch_size,
+            pretrain=opt.pretrain,
+            embed_dims=opt.embed_dims,
+            num_heads=opt.num_heads,
+            num_transformer_layers=opt.num_transformer_layers,
+            in_channels=opt.in_channels,
+            conv_type=opt.conv_type,
+            dropout_p=opt.dropout_p,
+            attention_type=opt.attention_type,
+        )
+    elif opt.model == 'vivit':
+        assert opt.attention_type in ['fact_encoder', 'joint_space_time', 'divided_space_time']
+        model = ViViT(
+            num_frames=opt.num_frames,
+            img_size=opt.img_size,
+            patch_size=opt.patch_size,
+            pretrain=opt.pretrain,
+            embed_dims=opt.embed_dims,
+            num_heads=opt.num_heads,
+            num_transformer_layers=opt.num_transformer_layers,
+            in_channels=opt.in_channels,
+            conv_type=opt.conv_type,
+            dropout_p=opt.dropout_p,
+            attention_type=opt.attention_type
+        )
+    return model
+
 
 
 def show_trainable_params(named_parameters):
@@ -38,10 +72,6 @@ def build_param_groups(model, no_decay_layer):
 class VideoTransformer(pl.LightningModule):
 
 	def __init__(self, 
-				 lr,
-				 n_crops,
-				 log_interval,
-				 num_classes,
 				 trainer,
 				 ckpt_dir,
 				 do_eval,
@@ -51,13 +81,13 @@ class VideoTransformer(pl.LightningModule):
 		super().__init__()
 		self.opt = opt
 		self.model = get_model(opt)
-		self.cls_head = ClassificationHead(num_classes, model_kwargs['embed_dims'])
+		self.cls_head = ClassificationHead(opt.num_classes, opt.embed_dims)
 		self.trainer = trainer
 		
-		self.lr = lr
-		self.n_crops = n_crops
-		self.num_classes = num_classes
-		self.log_interval = log_interval
+		self.lr = opt.learning_rate
+		self.n_crops = opt.n_crops
+		self.num_classes = opt.num_classes
+		self.log_interval = opt.log_interval
 		self.iteration = 0
 		self.data_start = 0
 		self.max_top1_acc = 0
