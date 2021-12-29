@@ -35,3 +35,10 @@ def get_std(norm_value=255):
         38.7568578 / norm_value, 37.88248729 / norm_value,
         40.02898126 / norm_value
     ]
+
+
+def load_value_file(file_path):
+    with open(file_path, 'r') as input_file:
+        value = float(input_file.read().rstrip('\n\r'))
+
+    return value

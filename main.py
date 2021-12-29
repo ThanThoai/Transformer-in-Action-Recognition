@@ -1,3 +1,4 @@
+import comet_ml
 import os
 import time
 import random
@@ -12,14 +13,15 @@ import torch
 import torch.utils.data as data
 from dataset import ActionDataModule
 from utils import print_on_rank_zero, get_mean, get_std
-from opts import parse_args
-from .spatial_transforms import *
-from .temporal_transforms import *
-from .target_transforms import *
+from opts import parse_opts
+from spatial_transforms import *
+from temporal_transforms import *
+from target_transforms import Compose as TargetCompose
+from target_transforms import ClassLabel, VideoID
 from models import VideoTransformer
 
 def run():
-	args = parse_args()
+	args = parse_opts()
 	warnings.filterwarnings('ignore')
 	
 	ROOT_DIR = args.result_path
@@ -30,7 +32,9 @@ def run():
 	log_dir = os.path.join(ROOT_DIR, 'log')
 	os.makedirs(ckpt_dir, exist_ok=True)
 	os.makedirs(log_dir, exist_ok=True)
-	
+	args.scales = [args.initial_scale]
+	for i in range(1, args.n_scales):
+		args.scales.append(args.scales[-1] * args.scale_step)
 	args.mean = get_mean(args.norm_value, args.mean_dataset)
 	args.std  = get_std(args.norm_value)
 
@@ -59,12 +63,13 @@ def run():
 			RandomHorizontalFlip(),
 			#RandomRotate(),
 			#RandomResize(),
-			crop_method,
+# 			crop_method,
 			#MultiplyValues(),
 			#Dropout(),
 			#SaltImage(),
 			#Gaussian_blur(),
 			#SpatialElasticDisplacement(),
+			FixResize(args.img_size),
 			ToTensor(args.norm_value), norm_method
 		])
 		train_temporal_transform = TemporalRandomCrop(args.num_frames, args.downsample)
@@ -76,29 +81,35 @@ def run():
 
 
 	if not args.no_val:
+		do_eval = True
 		val_spatial_transform = Compose([
 			Scale(args.img_size),
 			# CenterCrop(args.img_size),
+			FixResize(args.img_size),
 			ToTensor(args.img_size), norm_method
 		])
 		#temporal_transform = LoopPadding(opt.sample_duration)
 		val_temporal_transform = TemporalCenterCrop(args.sample_duration, args.downsample)
 		val_target_transform = ClassLabel()
 	else:
+		do_eval = False
 		val_spatial_transform = None
 		val_temporal_transform = None
 		val_target_transform = None
 
 	if args.test:
+		do_test = True
 		test_spatial_transform = Compose([
 			Scale(int(args.img_size / args.scale_in_test)),
-			CornerCrop(args.img_size, args.crop_position_in_test),
+# 			CornerCrop(args.img_size, args.crop_position_in_test),
+			FixResize(args.img_size),
 			ToTensor(args.norm_value), norm_method
 		])
 		test_temporal_transform = TemporalRandomCrop(args.sample_duration, args.downsample)
 		test_target_transform = VideoID()
 
 	else:
+		do_test = False
 		test_spatial_transform = None
 		test_temporal_transform = None
 		test_target_transform = None
@@ -122,13 +133,13 @@ def run():
 		offline=True)
 
 	trainer = pl.Trainer(
-		gpus=args.gpus, # devices=-1
+		gpus=[0], # devices=-1
 		accelerator="ddp", # accelerator="gpu",strategy='ddp'
 		plugins=DDPPlugin(find_unused_parameters=False),
-		max_epochs=args.num_epochs,
+		max_epochs=args.n_epochs,
 		callbacks=[
 			LearningRateMonitor("epoch"),
-			ModelCheckpoint(every_n_epoch = 1)
+			ModelCheckpoint(every_n_epochs = 1)
 		],
 		logger=comet_logger,
 		check_val_every_n_epoch=1,
@@ -142,7 +153,7 @@ def run():
 	random.seed(args.manual_seed)
 	pl.seed_everything(args.manual_seed, workers=True)
 		
-	model = VideoTransformer()
+	model = VideoTransformer(trainer, ckpt_dir, do_eval, do_test, args)
 	
 	timestamp = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
 	print_on_rank_zero(f'{timestamp} - INFO - Start running,')

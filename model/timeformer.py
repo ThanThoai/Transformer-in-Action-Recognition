@@ -1,7 +1,7 @@
 from einops import rearrange, reduce, repeat
 import torch
 import torch.nn as nn
-
+import numpy as np
 from .utils import PatchEmbed, TransformerContainer, get_sine_cosine_pos_emb
 from .weight_init import trunc_normal_, init_from_vit_pretrain_,  init_from_mae_pretrain_, init_from_k600_pretrain_
 
@@ -122,7 +122,7 @@ class TimeSformer(nn.Module):
 		# temporal pos_emb
 		if self.attention_type != 'space_only':	
 			if use_learnable_pos_emb:
-				self.time_embed = nn.Parameter(torch.zeros(1,num_frames,embed_dims))
+				self.time_embed = nn.Parameter(torch.zeros(1,num_frames ,embed_dims))
 			else:
 				self.time_embed = get_sine_cosine_pos_emb(num_frames,embed_dims)
 			self.drop_after_time = nn.Dropout(p=dropout_p)
@@ -193,6 +193,8 @@ class TimeSformer(nn.Module):
 				x = torch.cat((cls_tokens, x), dim=1)
 			else:
 				x = rearrange(x[:, 1:, :], '(b t) p d -> (b p) t d', b=b)
+# 				print(x.shape)
+# 				print(self.time_embed.shape)
 				if self.use_learnable_pos_emb:
 					x = x + self.time_embed
 				else:

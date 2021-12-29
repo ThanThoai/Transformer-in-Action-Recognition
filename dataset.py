@@ -4,9 +4,9 @@ import torch
 import torch.nn as nn
 import numpy as np
 from torch.utils.data.dataloader import DataLoader
-from datasets.kinetics import Kinetics
-from datasets.ucf101 import UCF101
-from datasets.jester import Jester
+# from .datasets import Kinetics
+# from .datasets import UCF101
+from datasets import Jester
 
 
 def get_training_set(opt, spatial_transform, temporal_transform,
@@ -27,6 +27,7 @@ def get_training_set(opt, spatial_transform, temporal_transform,
 			opt.video_path,
 			opt.annotation_path,
 			'training',
+			n_samples_for_each_video=1,
 			spatial_transform=spatial_transform,
 			temporal_transform=temporal_transform,
 			target_transform=target_transform,
@@ -170,21 +171,21 @@ class ActionDataModule(pl.LightningDataModule):
 
 
 	def setup(self, stage):
-		if not self.no_train:
+		if not self.opt.no_train:
 			self.train_dataset = get_training_set(
 				self.opt,
 				self.train_spatial_transform,
 				self.train_temporal_transform,
 				self.train_target_transform)
 		
-		if not self.no_val:
+		if not self.opt.no_val:
 			self.val_dataset = get_validation_set(
 				self.opt,
 				self.val_spatial_transform,
 				self.val_temporal_transform,
 				self.val_target_transform)
 		
-		if self.test:
+		if self.opt.test:
 			self.val_dataset = get_validation_set(
 				self.opt,
 				self.test_spatial_transform,
@@ -195,32 +196,32 @@ class ActionDataModule(pl.LightningDataModule):
 	def train_dataloader(self):
 		return DataLoader(
 			self.train_dataset,
-			batch_size=self.args.batch_size,
-			num_workers=self.args.num_workers,
-			collate_fn=Collator().collate,
+			batch_size=self.opt.batch_size,
+			num_workers=self.opt.num_workers,
+# 			collate_fn=Collator().collate,
 			shuffle=True,
-			drop_last=True, 
+# 			drop_last=True, 
 			pin_memory=True
 		)
 	
 	def val_dataloader(self):
-		if self.val_ann_path is not None:
+		if self.val_spatial_transform is not None:
 			return DataLoader(
 				self.val_dataset,
-				batch_size=self.args.batch_size // 2,
-				num_workers=self.args.num_workers,
-				collate_fn=Collator().collate,
+				batch_size=self.opt.batch_size // 2,
+				num_workers=self.opt.num_workers,
+# 				collate_fn=Collator().collate,
 				shuffle=False,
-				drop_last=False,
+# 				drop_last=False,
 			)
 	
 	def test_dataloader(self):
-		if self.test_ann_path is not None:
+		if self.test_spatial_transform is not None:
 			return DataLoader(
 				self.test_dataset,
-				batch_size=self.args.batch_size,
-				num_workers=self.args.num_workers,
-				collate_fn=Collator().collate,
+				batch_size=self.opt.batch_size // 2,
+				num_workers=self.opt.num_workers,
+# 				collate_fn=Collator().collate,
 				shuffle=False,
-				drop_last=False,
+# 				drop_last=False,
 			)

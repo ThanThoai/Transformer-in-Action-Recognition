@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 from torch.nn.modules.utils import _pair
 
-from weight_init import trunc_normal_, constant_init_, kaiming_init_
+from .weight_init import trunc_normal_, constant_init_, kaiming_init_
 
 
 # sin-cos position encoding

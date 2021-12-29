@@ -369,12 +369,6 @@ class MultiScaleRandomCrop(object):
         self.tl_y = random.random()
 
 
-
-
-
-
-
-
 class SpatialElasticDisplacement(object):
 
     def __init__(self, sigma=3.0, alpha=1.0, order=3, cval=0, mode="constant"):
@@ -449,6 +443,34 @@ class RandomRotate(object):
 
     def randomize_parameters(self):
         self.rotate_angle = random.randint(-10, 10)
+        
+# class FixResize(object):
+#     def __init__(self, size, scale=1):
+#         self.size = size
+#         self.scale = scale
+#         self.interpolation = Image.BILINEAR
+ 
+#     def __call__(self, img):
+#         im_size = img.size
+#         ret_img = img.resize((int(self.size *self.scale), int(self.size*self.scale)))
+#         return ret_img
+    
+#     def randomize_parameters(self):
+#         self.scale = 1
+        
+class FixResize(object):
+    def __init__(self, size, scale=1):
+        self.size = size
+        self.scale = scale
+ 
+    def __call__(self, img):
+        img = np.array(img)
+        ret_img = cv2.resize(img, (int(self.size *self.scale), int(self.size*self.scale)))
+        ret_img = Image.fromarray(ret_img)
+        return ret_img
+    
+    def randomize_parameters(self):
+        self.scale = 1        
 
 
 class RandomResize(object):
